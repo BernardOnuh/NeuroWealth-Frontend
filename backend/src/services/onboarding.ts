@@ -19,6 +19,7 @@ import {
   setPendingWithdrawal,
   executeWithdrawal,
   cancelWithdrawal,
+  addTransaction,
   Strategy,
   OnboardingStep,
   User,
@@ -34,6 +35,10 @@ import {
   formatMidOnboardingReply,
   isBalanceIntent,
 } from "./portfolio";
+import {
+  buildHistoryReply,
+  isHistoryIntent,
+} from "./history";
 
 // ─── Strategy metadata ────────────────────────────────────────────────────────
 
@@ -280,7 +285,6 @@ const FAQ: FaqEntry[] = [
       "• Reply *BALANCE* anytime to see your current earnings\n\n" +
       "Yield compounds into your position — no manual claiming needed.",
   },
-  // ── NEW: What can you do / capabilities ──────────────────────────────────
   {
     patterns: [
       /\bwhat\s+can\s+(you|neurowealth)\s+do\b/i,
@@ -302,7 +306,6 @@ const FAQ: FaqEntry[] = [
       "• 🔒 *Non-custodial* — your keys, your funds\n\n" +
       "Reply *HELP* to see all available commands.",
   },
-  // ── NEW: APY / returns / how much will I earn ─────────────────────────────
   {
     patterns: [
       /\bhow\s+much\s+(will\s+i\s+|can\s+i\s+)?earn\b/i,
@@ -322,7 +325,6 @@ const FAQ: FaqEntry[] = [
       "actual returns vary with market conditions.\n\n" +
       "Reply with a strategy name to get started, or *BALANCE* to check your current earnings.",
   },
-  // ── NEW: Lock-up / can I leave / cancel account ───────────────────────────
   {
     patterns: [
       /\bam\s+i\s+locked\s+(in|up)\b/i,
@@ -340,7 +342,6 @@ const FAQ: FaqEntry[] = [
       "Just reply *WITHDRAW* and your USDC is back in your wallet within seconds.\n\n" +
       "No cancellation fees, no exit penalties.",
   },
-  // ── NEW: Referral / invite friends ────────────────────────────────────────
   {
     patterns: [
       /\breferral\b/i,
@@ -355,7 +356,6 @@ const FAQ: FaqEntry[] = [
       "They can get started by messaging this number.\n\n" +
       "Reply *HELP* to see what else you can do.",
   },
-  // ── NEW: Support / contact ────────────────────────────────────────────────
   {
     patterns: [
       /\bcontact\s+(support|us|you|team)\b/i,
@@ -390,12 +390,12 @@ const WELCOME =
 const HELP_MSG =
   "🤖 NeuroWealth Commands\n" +
   "━━━━━━━━━━━━━━━━━━━━\n\n" +
-  " BALANCE — Check your portfolio\n" +
-  " DEPOSIT — Get your deposit address\n" +
-  " WITHDRAW — Withdraw your funds\n" +
-  " STRATEGY — Change investment strategy\n" +
-  " HISTORY — View recent transactions\n" +
-  " HELP — Show this menu\n\n" +
+  " balance — Check your portfolio\n" +
+  " deposit — Get your deposit address\n" +
+  " withdraw — Withdraw your funds\n" +
+  " strategy — Change investment strategy\n" +
+  " history — View recent transactions\n" +
+  " help — Show this menu\n\n" +
   "━━━━━━━━━━━━━━━━━━━━\n" +
   "Questions? Just ask in plain English!\n\n" +
   "Support: support@neurowealth.io";
@@ -544,6 +544,7 @@ export async function handleOnboarding(
   const input = text.body.trim();
   const lower = input.toLowerCase();
   const requestedBalance = isBalanceIntent(lower);
+  const requestedHistory = isHistoryIntent(lower);
 
   // ── HELP shortcut — works at any stage ───────────────────────────────────
   if (HELP_TRIGGERS.has(lower)) return HELP_MSG;
@@ -564,6 +565,15 @@ export async function handleOnboarding(
       );
     }
 
+    if (requestedHistory) {
+      return (
+        "📜 Transaction History\n" +
+        "━━━━━━━━━━━━━━━━━━━━\n\n" +
+        "No transactions yet.\n\n" +
+        "Reply *DEPOSIT* to get started!"
+      );
+    }
+
     // Try FAQ even for brand-new users
     const faqAnswer = matchFaq(input);
     if (faqAnswer) return faqAnswer + "\n\n" + "Reply *HI* to get started!";
@@ -578,6 +588,11 @@ export async function handleOnboarding(
     }
 
     return buildPortfolioBalanceReply(user);
+  }
+
+  // ── Transaction history command ───────────────────────────────────────────
+  if (requestedHistory) {
+    return buildHistoryReply(user);
   }
 
   // ── FAQ — plain-English questions, works at any stage ────────────────────
@@ -715,6 +730,19 @@ async function handleStep(
 
           if (result.success && result.txHash) {
             await executeWithdrawal(from);
+
+            // Log withdrawal transaction
+            await addTransaction({
+              phone: from,
+              type: "withdrawal",
+              amount: withdrawalAmount,
+              txHash: result.txHash,
+              strategy: user.strategy || undefined,
+              metadata: {
+                walletAddress: user.walletAddress!,
+              },
+            });
+
             const successMsg = withdrawalComplete(withdrawalAmount, result.txHash);
             if (replyCallback) {
               await replyCallback(from, phoneNumberId, successMsg);
@@ -763,12 +791,7 @@ async function handleStep(
       }
 
       if (lower === "history") {
-        // Placeholder — wire up to real transaction log when available
-        return (
-          "📜 *Recent Transactions*\n\n" +
-          "Transaction history is coming soon.\n\n" +
-          "Reply *BALANCE* to see your current portfolio value."
-        );
+        return buildHistoryReply(user);
       }
 
       // Check strategy switch for active users
