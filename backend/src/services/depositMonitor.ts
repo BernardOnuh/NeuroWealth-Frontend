@@ -230,6 +230,11 @@ class DepositMonitorService {
       }
     }, delay);
   }
+  
+  /**
+   * Establish a Horizon streaming connection for a wallet
+   */
+  private establishConnection(connection: StreamConnection): void {
     try {
       logger.info({ walletAddress: connection.walletAddress }, 'Establishing Horizon streaming connection');
 
@@ -249,13 +254,22 @@ class DepositMonitorService {
               );
             }
           },
-          onerror: (error) => {
+          onerror: (error: unknown) => {
+            const anyErr = error as any;
+            const message =
+              anyErr && typeof anyErr.message === 'string'
+                ? anyErr.message
+                : typeof anyErr === 'string'
+                ? anyErr
+                : 'Unknown stream error';
+
             logger.error(
-              { error: error.message, walletAddress: connection.walletAddress },
+              { error: message, walletAddress: connection.walletAddress },
               'Horizon stream error'
             );
 
-            connection.lastError = error as Error;
+            connection.lastError =
+              anyErr instanceof Error ? anyErr : new Error(message);
             connection.lastErrorAt = new Date();
 
             // Close existing stream

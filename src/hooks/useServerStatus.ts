@@ -27,7 +27,8 @@ export function useServerStatus() {
     }, []);
 
     useEffect(() => {
-        check();
+        // Defer the initial check to avoid synchronous state updates in effect
+        setTimeout(() => { void check(); }, 0);
         const interval = setInterval(check, 10_000);
         return () => clearInterval(interval);
     }, [check]);
