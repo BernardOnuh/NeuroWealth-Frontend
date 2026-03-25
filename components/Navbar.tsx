@@ -12,8 +12,14 @@ export function Navbar() {
           <Link href="#features" className="hover:text-white transition-colors">Features</Link>
           <Link href="#how-it-works" className="hover:text-white transition-colors">How it works</Link>
           <Link href="#strategies" className="hover:text-white transition-colors">Strategies</Link>
+          <Link href="/help" className="hover:text-white transition-colors">Help</Link>
         </div>
-        <WalletConnect />
+        <div className="flex items-center gap-4">
+          <Link href="/help" className="md:hidden text-sm text-slate-400 hover:text-white transition-colors">
+            Help
+          </Link>
+          <WalletConnect />
+        </div>
       </div>
     </nav>
   );
