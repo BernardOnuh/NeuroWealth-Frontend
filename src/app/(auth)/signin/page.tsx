@@ -56,7 +56,7 @@ export default function SignInPage() {
               className="w-full bg-dark-900 border border-white/10 rounded-xl px-4 min-h-[44px] text-white focus:outline-none focus:ring-2 focus:ring-brand-400 focus:border-transparent transition-all placeholder:text-slate-600"
               required
             />
-            <p className="text-[10px] text-slate-500 italic px-1">Hint: Use "password123" for mock login</p>
+            <p className="text-[10px] text-slate-500 italic px-1">Hint: Use &quot;password123&quot; for mock login</p>
           </div>
 
           {error && (
@@ -76,7 +76,7 @@ export default function SignInPage() {
 
         <div className="mt-8 pt-8 border-t border-white/5 text-center">
           <p className="text-slate-500 text-sm">
-            Don't have an account?{" "}
+            Don&apos;t have an account?{" "}
             <Link href="/signup" className="text-brand-400 hover:text-brand-300 font-bold transition-colors">
               Sign Up
             </Link>
