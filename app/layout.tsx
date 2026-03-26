@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import "./globals.css";
-import { WalletProvider } from "@/contexts";
+import { WalletProvider, AuthProvider } from "@/contexts";
 
 export const metadata: Metadata = {
   metadataBase: new URL("https://neurowealth.app"),
@@ -59,9 +59,11 @@ export default function RootLayout({
 }) {
   return (
     <html lang="en" className="dark" suppressHydrationWarning>
-    <WalletProvider> 
-      <body className="antialiased">{children}</body>
-    </WalletProvider>
+      <body className="antialiased">
+        <WalletProvider>
+          <AuthProvider>{children}</AuthProvider>
+        </WalletProvider>
+      </body>
     </html>
   );
 }

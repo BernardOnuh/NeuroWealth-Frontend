@@ -9,7 +9,7 @@ import {
   ChartTone,
   PortfolioPayload,
   PortfolioScenario,
-} from "@/src/lib/portfolio";
+} from "@/lib/portfolio";
 import {
   formatCurrency,
   formatPercent,
@@ -17,7 +17,7 @@ import {
   formatSignedPercent,
   formatSyncLabel,
   formatTimestamp,
-} from "@/src/lib/formatters";
+} from "@/lib/formatters";
 
 type ThemeMode = "light" | "dark";
 

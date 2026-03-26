@@ -1,4 +1,4 @@
-import { TransactionFlow } from "@/src/components/transactions/TransactionFlow";
+import { TransactionFlow } from "@/components/transactions/TransactionFlow";
 import { Suspense } from "react";
 
 export default function TransactionsPage() {

@@ -3,8 +3,8 @@ import {
   formatPercent,
   formatSignedCurrency,
   formatSignedPercent,
-} from "@/src/lib/formatters";
-import { buildScenarioPayload } from "@/src/lib/portfolio";
+} from "@/lib/formatters";
+import { buildScenarioPayload } from "@/lib/portfolio";
 import { ImageResponse } from "next/og";
 
 export const dynamic = "force-dynamic";

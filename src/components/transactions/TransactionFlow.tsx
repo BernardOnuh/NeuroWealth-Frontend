@@ -4,7 +4,7 @@ import { startTransition, useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import styles from "./transaction-flow.module.css";
-import { formatCurrency, formatTimestamp } from "@/src/lib/formatters";
+import { formatCurrency, formatTimestamp } from "@/lib/formatters";
 import {
   buildPreviewSnapshot,
   buildStatusChips,
@@ -21,7 +21,7 @@ import {
   TransactionQuote,
   TransactionReceipt,
   validateTransactionValues,
-} from "@/src/lib/transactions";
+} from "@/lib/transactions";
 
 type ThemeMode = "light" | "dark";
 

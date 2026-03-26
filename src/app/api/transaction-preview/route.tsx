@@ -1,11 +1,11 @@
-import { formatCurrency, formatTimestamp } from "@/src/lib/formatters";
+import { formatCurrency, formatTimestamp } from "@/lib/formatters";
 import {
   buildPreviewSnapshot,
   buildStatusChips,
   getTransactionContext,
   parsePreviewState,
   parseTransactionKind,
-} from "@/src/lib/transactions";
+} from "@/lib/transactions";
 import { ImageResponse } from "next/og";
 
 export const dynamic = "force-dynamic";

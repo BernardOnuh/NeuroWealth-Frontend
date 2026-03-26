@@ -1,9 +1,11 @@
-﻿'use client';
+'use client';
 
 import Link from "next/link";
 import WalletConnectButton from "./WalletConnectButton";
 import { ThemeToggle } from "./ThemeToggle";
-import { useWallet, useWalletConfig } from "../contexts";
+import { NotificationToggle } from "./notifications/NotificationToggle";
+import { useAuth, useWallet, useWalletConfig } from "@/contexts";
+import { Button } from "./ui/Button";
 
 function truncateAddress(address: string) {
   if (!address || address.length < 12) return address;
@@ -19,6 +21,7 @@ function formatNetworkLabel(network?: string) {
 }
 
 export function Navbar() {
+  const { user, signOut } = useAuth();
   const { connected, isRestoring, publicKey } = useWallet();
   const config = useWalletConfig();
   const networkLabel = formatNetworkLabel(config?.network);
@@ -42,7 +45,7 @@ export function Navbar() {
             Help
           </Link>
 
-          {!isRestoring && connected && publicKey ? (
+          {!isRestoring && connected && publicKey && (
             <div className="hidden sm:flex items-center gap-2">
               <span className="inline-flex items-center rounded-full border border-cyan-500/30 bg-cyan-500/10 px-3 py-1.5 text-xs font-semibold tracking-wide text-cyan-300">
                 {networkLabel}
@@ -52,9 +55,31 @@ export function Navbar() {
                 {truncateAddress(publicKey)}
               </span>
             </div>
-          ) : null}
+          )}
 
+          <NotificationToggle />
           <WalletConnectButton />
+
+          {user ? (
+            <div className="flex items-center gap-3 ml-2 pl-4 border-l border-white/10">
+              <div className="flex flex-col items-end">
+                <span className="text-[10px] text-slate-500 uppercase font-bold leading-none">Account</span>
+                <span className="text-xs text-white font-medium">{user.name}</span>
+              </div>
+              <button
+                onClick={signOut}
+                className="text-[10px] text-slate-500 hover:text-red-400 transition-colors uppercase font-bold"
+              >
+                Sign Out
+              </button>
+            </div>
+          ) : (
+            <Link href="/signin">
+              <Button variant="secondary" size="sm" className="text-xs h-9">
+                Sign In
+              </Button>
+            </Link>
+          )}
         </div>
       </div>
     </nav>

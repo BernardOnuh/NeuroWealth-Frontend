@@ -4,7 +4,7 @@ import {
   parseTransactionKind,
   TransactionRequestPayload,
   validateTransactionValues,
-} from "@/src/lib/transactions";
+} from "@/lib/transactions";
 import { NextResponse } from "next/server";
 
 function resolveEndpoint(baseUrl: string, pathOrUrl: string): string {

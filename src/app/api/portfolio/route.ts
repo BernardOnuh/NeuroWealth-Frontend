@@ -2,7 +2,7 @@ import {
   buildScenarioPayload,
   normalizePortfolioPayload,
   parseScenario,
-} from "@/src/lib/portfolio";
+} from "@/lib/portfolio";
 import { NextRequest, NextResponse } from "next/server";
 
 function resolveEndpoint(baseUrl: string, pathOrUrl: string): string {
