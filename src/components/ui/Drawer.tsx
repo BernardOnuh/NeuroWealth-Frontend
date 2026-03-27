@@ -4,33 +4,25 @@ import { useEffect, useRef, ReactNode } from "react";
 import { createPortal } from "react-dom";
 import { useFocusTrap } from "@/hooks/useFocusTrap";
 
-export type ModalSize = "sm" | "md" | "lg";
-
-interface ModalProps {
+interface DrawerProps {
   isOpen: boolean;
   onClose: () => void;
   title: string;
   children: ReactNode;
   footer?: ReactNode;
   preventClose?: boolean;
-  size?: ModalSize;
+  side?: "left" | "right";
 }
 
-const sizeClasses: Record<ModalSize, string> = {
-  sm: "max-w-sm",
-  md: "max-w-[560px]",
-  lg: "max-w-2xl",
-};
-
-export function Modal({
+export function Drawer({
   isOpen,
   onClose,
   title,
   children,
   footer,
   preventClose = false,
-  size = "md",
-}: ModalProps) {
+  side = "right",
+}: DrawerProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   useFocusTrap(containerRef, isOpen);
 
@@ -47,35 +39,41 @@ export function Modal({
     };
   }, [isOpen, preventClose, onClose]);
 
+  const slideClass = side === "right"
+    ? isOpen ? "translate-x-0" : "translate-x-full"
+    : isOpen ? "translate-x-0" : "-translate-x-full";
+
+  const positionClass = side === "right" ? "right-0" : "left-0";
+
   if (!isOpen) return null;
 
   return createPortal(
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center"
+      className="fixed inset-0 z-50 flex"
       aria-modal="true"
       role="dialog"
-      aria-labelledby="modal-title"
+      aria-labelledby="drawer-title"
     >
       {/* Backdrop */}
       <div
-        className="absolute inset-0 bg-black/60 backdrop-blur-sm transition-opacity"
+        className="absolute inset-0 bg-black/60 backdrop-blur-sm"
         onClick={() => !preventClose && onClose()}
       />
 
-      {/* Panel */}
+      {/* Panel — 360px desktop, full mobile */}
       <div
         ref={containerRef}
-        className={`relative z-10 w-full ${sizeClasses[size]} mx-4 bg-white dark:bg-zinc-900 rounded-2xl shadow-2xl flex flex-col`}
+        className={`absolute top-0 bottom-0 ${positionClass} z-10 w-full sm:w-[360px] bg-white dark:bg-zinc-900 shadow-2xl flex flex-col transform transition-transform duration-300 ease-in-out ${slideClass}`}
       >
         {/* Header — 16px padding */}
-        <div className="flex items-center justify-between px-4 py-4 border-b border-zinc-200 dark:border-zinc-700">
-          <h2 id="modal-title" className="text-lg font-semibold text-zinc-90dark:text-zinc-100">
+        <div className="flex items-center justify-between px-4 py-4 border-b border-zinc-2ark:border-zinc-700">
+          <h2 id="drawer-title" className="text-lg font-semibold text-zinc-900 dark:text-zinc-100">
             {title}
           </h2>
           {!preventClose && (
             <button
               onClick={onClose}
-              aria-label="Close modal"
+              aria-label="Close drawer"
               className="p-1.5 rounded-lg text-zinc-400 hover:text-zinc-600 hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors"
             >
               <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -92,8 +90,8 @@ export function Modal({
 
         {/* Footer — 16px padding */}
         {footer && (
-          <div className="px-4 py-4 border-t border-zinc-200 dark:border-zinc-700 flex justify-end gap-3">
-        {footer}
+      <div className="px-4 py-4 border-t border-zinc-200 dark:border-zinc-700 flex justify-end gap-3">
+            {footer}
           </div>
         )}
       </div>
