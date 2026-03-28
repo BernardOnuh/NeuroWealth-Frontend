@@ -4,6 +4,7 @@ import { useState, useEffect } from "react";
 import { Lock, Shield, AlertCircle, CheckCircle2, Save, X } from "lucide-react";
 import { Button } from "@/components/ui/Button";
 import { mockAudit } from "@/lib/mock-audit";
+import { SettingsSectionSkeleton } from "@/components/ui/Skeleton";
 
 interface SecurityData {
   twoFactorEnabled: boolean;
@@ -26,17 +27,26 @@ export default function SecurityPage() {
   const [status, setStatus] = useState<"idle" | "success" | "error">("idle");
   const [showPasswordModal, setShowPasswordModal] = useState(false);
   const [newPassword, setNewPassword] = useState("");
+  const [pageLoading, setPageLoading] = useState(true);
 
   useEffect(() => {
-    try {
-      const stored = localStorage.getItem(STORAGE_KEY);
-      if (stored) {
-        const data = JSON.parse(stored);
-        setSaved(data);
-        setDraft(data);
-      }
-    } catch {}
+    const timer = setTimeout(() => {
+      try {
+        const stored = localStorage.getItem(STORAGE_KEY);
+        if (stored) {
+          const data = JSON.parse(stored);
+          setSaved(data);
+          setDraft(data);
+        }
+      } catch {}
+      setPageLoading(false);
+    }, 600);
+    return () => clearTimeout(timer);
   }, []);
+
+  if (pageLoading) {
+    return <SettingsSectionSkeleton rows={3} />;
+  }
 
   const isDirty = JSON.stringify(draft) !== JSON.stringify(saved);
 

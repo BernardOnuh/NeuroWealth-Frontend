@@ -3,9 +3,22 @@
 import { useState } from "react";
 import { Bell } from "lucide-react";
 import { EmptyState } from "@/components/ui/EmptyState";
+import { NotificationListSkeleton } from "@/components/ui/Skeleton";
 
 export default function NotificationsPage() {
   const [showEmpty, setShowEmpty] = useState(true);
+  const [loading, setLoading] = useState(false);
+
+  if (loading) {
+    return (
+      <div className="px-6 pt-8">
+        <div className="flex items-center justify-between pb-4">
+          <h1 className="text-2xl font-bold text-slate-100">Notifications</h1>
+        </div>
+        <NotificationListSkeleton items={5} />
+      </div>
+    );
+  }
 
   if (showEmpty) {
     return (
@@ -13,7 +26,10 @@ export default function NotificationsPage() {
         <div className="flex items-center justify-between px-6 pt-8 pb-4">
           <h1 className="text-2xl font-bold text-slate-100">Notifications</h1>
           <button
-            onClick={() => setShowEmpty(false)}
+            onClick={() => {
+              setLoading(true);
+              setTimeout(() => { setLoading(false); setShowEmpty(false); }, 1000);
+            }}
             className="text-xs text-slate-500 hover:text-slate-300 transition-colors"
           >
             Mock: show data

@@ -4,18 +4,30 @@ import { useState, useEffect } from "react";
 import { AuditEvent, mockAudit } from "@/lib/mock-audit";
 import { Download, Filter, ChevronDown } from "lucide-react";
 import { Button } from "@/components/ui/Button";
+import { AuditTableSkeleton } from "@/components/ui/Skeleton";
 
 type EventTypeFilter = "all" | AuditEvent["eventType"];
 
 export function AuditTrail() {
   const [events, setEvents] = useState<AuditEvent[]>([]);
+  const [loading, setLoading] = useState(true);
   const [filter, setFilter] = useState<EventTypeFilter>("all");
   const [sortOrder, setSortOrder] = useState<"desc" | "asc">("desc");
   const [expandedId, setExpandedId] = useState<string | null>(null);
 
   useEffect(() => {
-    setEvents(mockAudit.getEvents());
+    setLoading(true);
+    // Simulate async fetch of audit events
+    const timer = setTimeout(() => {
+      setEvents(mockAudit.getEvents());
+      setLoading(false);
+    }, 800);
+    return () => clearTimeout(timer);
   }, []);
+
+  if (loading) {
+    return <AuditTableSkeleton rows={6} />;
+  }
 
   const filteredEvents = events
     .filter((e) => filter === "all" || e.eventType === filter)

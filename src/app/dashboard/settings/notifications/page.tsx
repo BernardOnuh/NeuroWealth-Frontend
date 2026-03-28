@@ -4,6 +4,7 @@ import { useState, useEffect } from "react";
 import { Bell, Mail, AlertCircle, CheckCircle2, Save, X } from "lucide-react";
 import { Button } from "@/components/ui/Button";
 import { mockAudit } from "@/lib/mock-audit";
+import { SettingsSectionSkeleton } from "@/components/ui/Skeleton";
 
 interface NotificationPreferences {
   emailNotifications: boolean;
@@ -28,17 +29,26 @@ export default function NotificationsPage() {
   const [editing, setEditing] = useState(false);
   const [saving, setSaving] = useState(false);
   const [status, setStatus] = useState<"idle" | "success" | "error">("idle");
+  const [pageLoading, setPageLoading] = useState(true);
 
   useEffect(() => {
-    try {
-      const stored = localStorage.getItem(STORAGE_KEY);
-      if (stored) {
-        const data = JSON.parse(stored);
-        setSaved(data);
-        setDraft(data);
-      }
-    } catch {}
+    const timer = setTimeout(() => {
+      try {
+        const stored = localStorage.getItem(STORAGE_KEY);
+        if (stored) {
+          const data = JSON.parse(stored);
+          setSaved(data);
+          setDraft(data);
+        }
+      } catch {}
+      setPageLoading(false);
+    }, 600);
+    return () => clearTimeout(timer);
   }, []);
+
+  if (pageLoading) {
+    return <SettingsSectionSkeleton rows={5} />;
+  }
 
   const isDirty = JSON.stringify(draft) !== JSON.stringify(saved);
 
