@@ -1,10 +1,11 @@
 "use client";
 
-import { useState, useEffect } from "react";
-import { Bell, Mail, AlertCircle, CheckCircle2, Save, X } from "lucide-react";
-import { Button } from "@/components/ui/Button";
-import { mockAudit } from "@/lib/mock-audit";
+import { useEffect, useState } from "react";
+import { AlertCircle, Bell, Mail, Save, ShieldAlert, X } from "lucide-react";
+import { useToast } from "@/components/notifications/ToastProvider";
+import { Button, Card, InlineBanner } from "@/components/ui";
 import { SettingsSectionSkeleton } from "@/components/ui/Skeleton";
+import { mockAudit } from "@/lib/mock-audit";
 
 interface NotificationPreferences {
   emailNotifications: boolean;
@@ -15,7 +16,7 @@ interface NotificationPreferences {
 }
 
 const STORAGE_KEY = "nw_notifications";
-const DEFAULT: NotificationPreferences = {
+const DEFAULT_PREFERENCES: NotificationPreferences = {
   emailNotifications: true,
   transactionAlerts: true,
   weeklyDigest: true,
@@ -23,26 +24,69 @@ const DEFAULT: NotificationPreferences = {
   securityAlerts: true,
 };
 
-export default function NotificationsPage() {
-  const [saved, setSaved] = useState<NotificationPreferences>(DEFAULT);
-  const [draft, setDraft] = useState<NotificationPreferences>(DEFAULT);
+function PreferenceToggle({
+  id,
+  title,
+  description,
+  checked,
+  disabled,
+  onChange,
+}: {
+  id: string;
+  title: string;
+  description: string;
+  checked: boolean;
+  disabled: boolean;
+  onChange: () => void;
+}) {
+  return (
+    <label
+      htmlFor={id}
+      className={`flex items-start justify-between gap-4 rounded-xl border border-slate-700/50 bg-slate-950/35 p-4 transition ${
+        disabled ? "opacity-65" : "hover:border-slate-600"
+      }`}
+    >
+      <div>
+        <p className="text-sm font-semibold text-slate-100">{title}</p>
+        <p className="mt-1 text-sm leading-6 text-slate-400">{description}</p>
+      </div>
+      <input
+        id={id}
+        type="checkbox"
+        checked={checked}
+        disabled={disabled}
+        onChange={onChange}
+        className="mt-1 h-4 w-4 rounded border-slate-600 bg-slate-900 text-sky-400 accent-sky-400"
+      />
+    </label>
+  );
+}
+
+export default function NotificationsSettingsPage() {
+  const { pushToast } = useToast();
+  const [saved, setSaved] = useState(DEFAULT_PREFERENCES);
+  const [draft, setDraft] = useState(DEFAULT_PREFERENCES);
   const [editing, setEditing] = useState(false);
+  const [pageLoading, setPageLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [status, setStatus] = useState<"idle" | "success" | "error">("idle");
-  const [pageLoading, setPageLoading] = useState(true);
 
   useEffect(() => {
     const timer = setTimeout(() => {
       try {
         const stored = localStorage.getItem(STORAGE_KEY);
         if (stored) {
-          const data = JSON.parse(stored);
-          setSaved(data);
-          setDraft(data);
+          const parsed = JSON.parse(stored) as NotificationPreferences;
+          setSaved(parsed);
+          setDraft(parsed);
         }
-      } catch {}
-      setPageLoading(false);
-    }, 600);
+      } catch {
+        // Keep defaults if storage is invalid.
+      } finally {
+        setPageLoading(false);
+      }
+    }, 500);
+
     return () => clearTimeout(timer);
   }, []);
 
@@ -51,23 +95,10 @@ export default function NotificationsPage() {
   }
 
   const isDirty = JSON.stringify(draft) !== JSON.stringify(saved);
+  const enabledCount = Object.values(draft).filter(Boolean).length;
 
-  const handleSave = async () => {
-    setSaving(true);
-    setStatus("idle");
-    try {
-      await new Promise((resolve) => setTimeout(resolve, 600));
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(draft));
-      setSaved(draft);
-      setStatus("success");
-      setEditing(false);
-      mockAudit.logEvent("settings_change", { section: "notifications", changes: draft });
-      setTimeout(() => setStatus("idle"), 3000);
-    } catch {
-      setStatus("error");
-    } finally {
-      setSaving(false);
-    }
+  const togglePreference = (key: keyof NotificationPreferences) => {
+    setDraft((current) => ({ ...current, [key]: !current[key] }));
   };
 
   const handleCancel = () => {
@@ -76,484 +107,239 @@ export default function NotificationsPage() {
     setStatus("idle");
   };
 
-  const toggleNotification = (key: keyof NotificationPreferences) => {
-    setDraft({ ...draft, [key]: !draft[key] });
+  const handleSave = async () => {
+    setSaving(true);
+    setStatus("idle");
+
+    try {
+      await new Promise((resolve) => setTimeout(resolve, 800));
+
+      if (!draft.securityAlerts) {
+        throw new Error("Security alerts must stay enabled in this mock.");
+      }
+
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(draft));
+      setSaved(draft);
+      setEditing(false);
+      setStatus("success");
+      mockAudit.logEvent("settings_change", { section: "notifications", changes: draft });
+      pushToast({
+        variant: "success",
+        title: "Preferences saved",
+        description: "Your notification rules were updated for future account activity.",
+        duration: 4000,
+      });
+    } catch {
+      setStatus("error");
+      pushToast({
+        variant: "error",
+        title: "Save failed",
+        description: "Security alerts are required in this mocked flow. Re-enable them and try again.",
+        duration: 6000,
+      });
+    } finally {
+      setSaving(false);
+    }
   };
 
   return (
-    <div className="notifications-page">
-      <div className="settings-header">
-        <div>
-          <h1 className="settings-title">Notifications</h1>
-          <p className="settings-subtitle">Manage how and when you receive notifications</p>
-        </div>
+    <div className="flex flex-col gap-6">
+      <div className="flex flex-col gap-2">
+        <h1 className="text-2xl font-bold text-slate-100">Notifications</h1>
+        <p className="text-sm text-slate-400">
+          Manage the alerts we send across email, account activity, and security events.
+        </p>
       </div>
 
-      {status === "success" && (
-        <div className="settings-banner settings-banner-success" role="status">
-          <CheckCircle2 size={16} />
-          <span>Notification preferences saved successfully</span>
-        </div>
-      )}
+      <InlineBanner
+        variant="info"
+        eyebrow="Page Message"
+        title="Inline banners are now reusable across settings and workflow pages"
+        action={
+          <Button variant="ghost" size="sm" onClick={() => setEditing(true)}>
+            Edit
+          </Button>
+        }
+      >
+        Page-level messages use semantic variants, accessible announcements, and consistent spacing.
+      </InlineBanner>
 
-      {status === "error" && (
-        <div className="settings-banner settings-banner-error" role="alert">
-          <AlertCircle size={16} />
-          <span>Failed to save preferences. Please try again.</span>
-        </div>
-      )}
+      {status === "success" ? (
+        <InlineBanner variant="success" title="Notification preferences saved">
+          The changes were persisted locally and announced through the global toast queue.
+        </InlineBanner>
+      ) : null}
 
-      {/* Email Notifications */}
-      <div className="settings-card">
-        <div className="settings-card-header">
-          <div className="settings-card-icon">
-            <Mail size={18} />
+      {status === "error" ? (
+        <InlineBanner
+          variant="error"
+          title="Unable to save your current selection"
+          action={
+            <Button
+              variant="secondary"
+              size="sm"
+              onClick={() => {
+                if (!draft.securityAlerts) {
+                  togglePreference("securityAlerts");
+                }
+              }}
+            >
+              Restore security alerts
+            </Button>
+          }
+        >
+          This mocked failure path intentionally blocks saving while security alerts are disabled.
+        </InlineBanner>
+      ) : null}
+
+      {!draft.securityAlerts ? (
+        <InlineBanner variant="warning" title="Security alerts are turned off">
+          High-risk account events may be missed until you re-enable security coverage.
+        </InlineBanner>
+      ) : null}
+
+      <div className="grid gap-6 xl:grid-cols-[1.45fr_0.85fr]">
+        <Card className="space-y-6 border-slate-700/50 bg-dark-800/70">
+          <div className="flex items-start gap-3">
+            <div className="rounded-xl border border-sky-400/25 bg-sky-500/10 p-2 text-sky-300">
+              <Mail className="h-4 w-4" />
+            </div>
+            <div>
+              <h2 className="text-lg font-semibold text-slate-100">Delivery channels</h2>
+              <p className="mt-1 text-sm text-slate-400">
+                Choose which updates reach inboxes, dashboards, and weekly summaries.
+              </p>
+            </div>
           </div>
-          <div>
-            <h2 className="settings-card-title">Email Notifications</h2>
-            <p className="settings-card-desc">Control email notification settings</p>
-          </div>
-        </div>
 
-        <div className="settings-card-body">
-          <div className="settings-field">
-            <label htmlFor="email-notif" className="settings-toggle-label">
-              <input
-                id="email-notif"
-                type="checkbox"
-                checked={draft.emailNotifications}
-                onChange={() => toggleNotification("emailNotifications")}
-                className="settings-toggle"
-                disabled={!editing}
-              />
-              <span>Enable email notifications</span>
-            </label>
-            <p className="settings-hint">
-              {draft.emailNotifications
-                ? "You'll receive email notifications for important account events."
-                : "Email notifications are disabled."}
-            </p>
+          <div className="space-y-3">
+            <PreferenceToggle
+              id="email-notifications"
+              title="Email notifications"
+              description="Receive delivery updates and account notices in your inbox."
+              checked={draft.emailNotifications}
+              disabled={!editing}
+              onChange={() => togglePreference("emailNotifications")}
+            />
+            <PreferenceToggle
+              id="transaction-alerts"
+              title="Transaction alerts"
+              description="Send a notification whenever a deposit, withdrawal, or rebalance completes."
+              checked={draft.transactionAlerts}
+              disabled={!editing || !draft.emailNotifications}
+              onChange={() => togglePreference("transactionAlerts")}
+            />
+            <PreferenceToggle
+              id="weekly-digest"
+              title="Weekly digest"
+              description="Bundle performance summaries and highlights into a single weekly update."
+              checked={draft.weeklyDigest}
+              disabled={!editing || !draft.emailNotifications}
+              onChange={() => togglePreference("weeklyDigest")}
+            />
+            <PreferenceToggle
+              id="marketing-emails"
+              title="Product updates"
+              description="Hear about launches, experiments, and platform improvements."
+              checked={draft.marketingEmails}
+              disabled={!editing || !draft.emailNotifications}
+              onChange={() => togglePreference("marketingEmails")}
+            />
+            <PreferenceToggle
+              id="security-alerts"
+              title="Security alerts"
+              description="Critical sign-in, wallet, and suspicious-activity notifications."
+              checked={draft.securityAlerts}
+              disabled={!editing}
+              onChange={() => togglePreference("securityAlerts")}
+            />
           </div>
+        </Card>
 
-          {draft.emailNotifications && (
-            <>
-              <div className="settings-field">
-                <label htmlFor="transaction-alerts" className="settings-toggle-label">
-                  <input
-                    id="transaction-alerts"
-                    type="checkbox"
-                    checked={draft.transactionAlerts}
-                    onChange={() => toggleNotification("transactionAlerts")}
-                    className="settings-toggle"
-                    disabled={!editing}
-                  />
-                  <span>Transaction alerts</span>
-                </label>
-                <p className="settings-hint">Get notified when transactions are completed</p>
+        <div className="space-y-6">
+          <Card className="space-y-4 border-slate-700/50 bg-dark-800/70">
+            <div className="flex items-start gap-3">
+              <div className="rounded-xl border border-sky-400/25 bg-sky-500/10 p-2 text-sky-300">
+                <Bell className="h-4 w-4" />
               </div>
-
-              <div className="settings-field">
-                <label htmlFor="weekly-digest" className="settings-toggle-label">
-                  <input
-                    id="weekly-digest"
-                    type="checkbox"
-                    checked={draft.weeklyDigest}
-                    onChange={() => toggleNotification("weeklyDigest")}
-                    className="settings-toggle"
-                    disabled={!editing}
-                  />
-                  <span>Weekly digest</span>
-                </label>
-                <p className="settings-hint">Receive a weekly summary of your account activity</p>
-              </div>
-
-              <div className="settings-field">
-                <label htmlFor="marketing" className="settings-toggle-label">
-                  <input
-                    id="marketing"
-                    type="checkbox"
-                    checked={draft.marketingEmails}
-                    onChange={() => toggleNotification("marketingEmails")}
-                    className="settings-toggle"
-                    disabled={!editing}
-                  />
-                  <span>Marketing emails</span>
-                </label>
-                <p className="settings-hint">
-                  Receive updates about new features and special offers
+              <div>
+                <h2 className="text-lg font-semibold text-slate-100">Current summary</h2>
+                <p className="mt-1 text-sm text-slate-400">
+                  Track enabled signals before publishing changes.
                 </p>
               </div>
-            </>
-          )}
+            </div>
+
+            <div className="space-y-3">
+              <div className="flex items-center justify-between rounded-xl border border-slate-700/50 bg-slate-950/35 px-4 py-3 text-sm">
+                <span className="text-slate-300">Enabled preferences</span>
+                <span className="font-semibold text-sky-300">{enabledCount} / 5</span>
+              </div>
+              <div className="flex items-center justify-between rounded-xl border border-slate-700/50 bg-slate-950/35 px-4 py-3 text-sm">
+                <span className="text-slate-300">Email channel</span>
+                <span className="font-semibold text-slate-100">
+                  {draft.emailNotifications ? "Active" : "Muted"}
+                </span>
+              </div>
+              <div className="flex items-center justify-between rounded-xl border border-slate-700/50 bg-slate-950/35 px-4 py-3 text-sm">
+                <span className="text-slate-300">Security coverage</span>
+                <span
+                  className={
+                    draft.securityAlerts
+                      ? "font-semibold text-emerald-300"
+                      : "font-semibold text-amber-300"
+                  }
+                >
+                  {draft.securityAlerts ? "Protected" : "At risk"}
+                </span>
+              </div>
+            </div>
+          </Card>
+
+          <Card className="space-y-3 border-slate-700/50 bg-dark-800/70">
+            <div className="flex items-start gap-3">
+              <div className="rounded-xl border border-amber-400/25 bg-amber-500/10 p-2 text-amber-300">
+                <ShieldAlert className="h-4 w-4" />
+              </div>
+              <div>
+                <h2 className="text-lg font-semibold text-slate-100">Save behavior</h2>
+                <p className="mt-1 text-sm text-slate-400">
+                  Successful saves emit a success banner and toast. Disabling security alerts simulates a blocked save.
+                </p>
+              </div>
+            </div>
+          </Card>
         </div>
       </div>
 
-      {/* Security Alerts */}
-      <div className="settings-card">
-        <div className="settings-card-header">
-          <div className="settings-card-icon">
-            <AlertCircle size={18} />
-          </div>
-          <div>
-            <h2 className="settings-card-title">Security Alerts</h2>
-            <p className="settings-card-desc">Critical security notifications</p>
-          </div>
+      {!editing ? (
+        <div>
+          <Button variant="secondary" onClick={() => setEditing(true)}>
+            Edit Preferences
+          </Button>
         </div>
-
-        <div className="settings-card-body">
-          <div className="settings-field">
-            <label htmlFor="security-alerts" className="settings-toggle-label">
-              <input
-                id="security-alerts"
-                type="checkbox"
-                checked={draft.securityAlerts}
-                onChange={() => toggleNotification("securityAlerts")}
-                className="settings-toggle"
-                disabled={!editing}
-              />
-              <span>Security alerts</span>
-            </label>
-            <p className="settings-hint">
-              {draft.securityAlerts
-                ? "You'll be notified of suspicious activity and security events."
-                : "Security alerts are disabled. We recommend enabling them."}
-            </p>
+      ) : (
+        <div
+          className="sticky bottom-6 z-40 flex flex-col gap-3 rounded-2xl border border-slate-700/60 bg-slate-950/90 p-4 shadow-[0_8px_32px_rgba(0,0,0,0.45)] backdrop-blur md:flex-row md:items-center md:justify-between"
+          role="group"
+          aria-label="Notification settings actions"
+        >
+          <div className="flex items-center gap-2 text-sm text-amber-300">
+            <AlertCircle className="h-4 w-4" />
+            <span>{isDirty ? "Unsaved changes" : "No pending changes"}</span>
           </div>
-        </div>
-      </div>
-
-      {/* Notification Summary */}
-      <div className="settings-card settings-card-info">
-        <div className="settings-card-header">
-          <div className="settings-card-icon">
-            <Bell size={18} />
-          </div>
-          <div>
-            <h2 className="settings-card-title">Notification Summary</h2>
-            <p className="settings-card-desc">Your current notification settings</p>
-          </div>
-        </div>
-
-        <div className="settings-card-body">
-          <div className="notification-summary">
-            <div className="summary-item">
-              <span className="summary-label">Email Notifications</span>
-              <span className={`summary-status ${draft.emailNotifications ? "enabled" : "disabled"}`}>
-                {draft.emailNotifications ? "Enabled" : "Disabled"}
-              </span>
-            </div>
-            <div className="summary-item">
-              <span className="summary-label">Security Alerts</span>
-              <span className={`summary-status ${draft.securityAlerts ? "enabled" : "disabled"}`}>
-                {draft.securityAlerts ? "Enabled" : "Disabled"}
-              </span>
-            </div>
-            <div className="summary-item">
-              <span className="summary-label">Active Preferences</span>
-              <span className="summary-count">
-                {Object.values(draft).filter(Boolean).length} of {Object.keys(draft).length}
-              </span>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      {!editing && (
-        <Button onClick={() => setEditing(true)} variant="secondary" size="md">
-          Edit Preferences
-        </Button>
-      )}
-
-      {editing && (
-        <div className="settings-action-bar" role="group" aria-label="Save or cancel changes">
-          {isDirty && <span className="settings-dirty-indicator">Unsaved changes</span>}
-          <div className="settings-actions">
-            <Button onClick={handleCancel} variant="ghost" size="md" disabled={saving}>
-              <X size={16} />
+          <div className="flex flex-col gap-2 sm:flex-row">
+            <Button variant="ghost" onClick={handleCancel} disabled={saving}>
+              <X className="h-4 w-4" />
               Cancel
             </Button>
-            <Button onClick={handleSave} size="md" disabled={saving} aria-busy={saving}>
-              {saving ? (
-                <>
-                  <span className="settings-spinner" aria-hidden="true" />
-                  Saving…
-                </>
-              ) : (
-                <>
-                  <Save size={16} />
-                  Save Changes
-                </>
-              )}
+            <Button onClick={handleSave} disabled={saving || !isDirty} aria-busy={saving}>
+              <Save className="h-4 w-4" />
+              {saving ? "Saving..." : "Save Changes"}
             </Button>
           </div>
         </div>
       )}
-
-      <style>{`
-        .notifications-page {
-          display: flex;
-          flex-direction: column;
-          gap: 24px;
-        }
-
-        .settings-header {
-          display: flex;
-          align-items: center;
-          justify-content: space-between;
-          gap: 16px;
-        }
-
-        .settings-title {
-          font-size: 24px;
-          font-weight: 700;
-          color: #e2e8f0;
-          margin: 0 0 4px;
-        }
-
-        .settings-subtitle {
-          font-size: 14px;
-          color: #94a3b8;
-          margin: 0;
-        }
-
-        .settings-banner {
-          display: flex;
-          align-items: center;
-          gap: 12px;
-          padding: 12px 16px;
-          border-radius: 10px;
-          font-size: 13px;
-          border: 1px solid;
-          animation: slideDown 0.2s ease-out;
-        }
-
-        @keyframes slideDown {
-          from {
-            opacity: 0;
-            transform: translateY(-10px);
-          }
-          to {
-            opacity: 1;
-            transform: translateY(0);
-          }
-        }
-
-        .settings-banner-success {
-          background: rgba(16, 185, 129, 0.08);
-          border-color: rgba(16, 185, 129, 0.3);
-          color: #6ee7b7;
-        }
-
-        .settings-banner-success svg {
-          color: #10b981;
-          flex-shrink: 0;
-        }
-
-        .settings-banner-error {
-          background: rgba(239, 68, 68, 0.08);
-          border-color: rgba(239, 68, 68, 0.3);
-          color: #fca5a5;
-        }
-
-        .settings-banner-error svg {
-          color: #ef4444;
-          flex-shrink: 0;
-        }
-
-        .settings-card {
-          background: rgba(15, 23, 42, 0.6);
-          border: 1px solid rgba(148, 163, 184, 0.15);
-          border-radius: 14px;
-          overflow: hidden;
-        }
-
-        .settings-card-info {
-          border-color: rgba(56, 189, 248, 0.2);
-          background: rgba(56, 189, 248, 0.05);
-        }
-
-        .settings-card-header {
-          display: flex;
-          align-items: flex-start;
-          gap: 12px;
-          padding: 20px 24px 16px;
-          border-bottom: 1px solid rgba(148, 163, 184, 0.1);
-        }
-
-        .settings-card-icon {
-          width: 34px;
-          height: 34px;
-          border-radius: 8px;
-          background: rgba(56, 189, 248, 0.1);
-          border: 1px solid rgba(56, 189, 248, 0.2);
-          display: flex;
-          align-items: center;
-          justify-content: center;
-          color: #38bdf8;
-          flex-shrink: 0;
-        }
-
-        .settings-card-title {
-          font-size: 14px;
-          font-weight: 600;
-          color: #e2e8f0;
-          margin: 0 0 2px;
-        }
-
-        .settings-card-desc {
-          font-size: 12px;
-          color: #64748b;
-          margin: 0;
-        }
-
-        .settings-card-body {
-          padding: 20px 24px;
-          display: flex;
-          flex-direction: column;
-          gap: 18px;
-        }
-
-        .settings-field {
-          display: flex;
-          flex-direction: column;
-          gap: 6px;
-        }
-
-        .settings-toggle-label {
-          display: flex;
-          align-items: center;
-          gap: 10px;
-          font-size: 14px;
-          color: #e2e8f0;
-          cursor: pointer;
-        }
-
-        .settings-toggle {
-          width: 18px;
-          height: 18px;
-          cursor: pointer;
-          accent-color: #38bdf8;
-        }
-
-        .settings-toggle:disabled {
-          opacity: 0.5;
-          cursor: not-allowed;
-        }
-
-        .settings-hint {
-          font-size: 12px;
-          color: #94a3b8;
-          margin: 4px 0 0;
-        }
-
-        .notification-summary {
-          display: flex;
-          flex-direction: column;
-          gap: 12px;
-        }
-
-        .summary-item {
-          display: flex;
-          align-items: center;
-          justify-content: space-between;
-          padding: 10px 12px;
-          background: rgba(15, 23, 42, 0.6);
-          border: 1px solid rgba(148, 163, 184, 0.1);
-          border-radius: 8px;
-          font-size: 13px;
-        }
-
-        .summary-label {
-          color: #cbd5e1;
-          font-weight: 500;
-        }
-
-        .summary-status {
-          padding: 4px 8px;
-          border-radius: 4px;
-          font-size: 11px;
-          font-weight: 600;
-          text-transform: uppercase;
-        }
-
-        .summary-status.enabled {
-          background: rgba(16, 185, 129, 0.15);
-          color: #10b981;
-        }
-
-        .summary-status.disabled {
-          background: rgba(148, 163, 184, 0.15);
-          color: #94a3b8;
-        }
-
-        .summary-count {
-          color: #38bdf8;
-          font-weight: 600;
-        }
-
-        .settings-action-bar {
-          display: flex;
-          align-items: center;
-          justify-content: space-between;
-          gap: 12px;
-          padding: 14px 20px;
-          background: rgba(2, 6, 23, 0.88);
-          backdrop-filter: blur(16px);
-          border: 1px solid rgba(148, 163, 184, 0.15);
-          border-radius: 12px;
-          position: sticky;
-          bottom: 24px;
-          z-index: 40;
-          box-shadow: 0 8px 32px rgba(0, 0, 0, 0.5);
-        }
-
-        .settings-dirty-indicator {
-          font-size: 12px;
-          color: #f59e0b;
-        }
-
-        .settings-actions {
-          display: flex;
-          gap: 10px;
-          margin-left: auto;
-        }
-
-        .settings-spinner {
-          display: inline-block;
-          width: 14px;
-          height: 14px;
-          border: 2px solid rgba(255, 255, 255, 0.25);
-          border-top-color: #fff;
-          border-radius: 50%;
-          animation: spin 0.65s linear infinite;
-        }
-
-        @keyframes spin {
-          to {
-            transform: rotate(360deg);
-          }
-        }
-
-        @media (max-width: 520px) {
-          .settings-card-header {
-            padding: 16px;
-          }
-
-          .settings-card-body {
-            padding: 16px;
-          }
-
-          .settings-action-bar {
-            flex-direction: column;
-            align-items: stretch;
-          }
-
-          .settings-actions {
-            flex-direction: column;
-            margin-left: 0;
-          }
-        }
-      `}</style>
     </div>
   );
 }

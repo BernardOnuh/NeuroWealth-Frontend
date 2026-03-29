@@ -21,6 +21,10 @@ import {
 
 type ThemeMode = "light" | "dark";
 
+function getTheme(searchParams: Pick<URLSearchParams, "get">): ThemeMode {
+  return searchParams.get("theme") === "dark" ? "dark" : "light";
+}
+
 interface EmptyStateProps {
   icon: React.ReactNode;
   copy: string;
@@ -100,10 +104,6 @@ function getScenario(
   searchParams: Pick<URLSearchParams, "get">,
 ): PortfolioScenario {
   return searchParams.get("scenario") === "empty" ? "empty" : "live";
-}
-
-function getTheme(searchParams: Pick<URLSearchParams, "get">): ThemeMode {
-  return searchParams.get("theme") === "dark" ? "dark" : "light";
 }
 
 function getValueTone(value: number): "positive" | "negative" | "neutral" {

@@ -1,390 +1,191 @@
 "use client";
 
-import React, { useState } from "react";
-import { useAuth } from "@/contexts/AuthContext";
-import { Button } from "@/components/ui/Button";
-import { mockAudit } from "@/lib/mock-audit";
+import { useState, type FormEvent } from "react";
 import Link from "next/link";
-import { AlertCircle, CheckCircle2 } from "lucide-react";
+import { CheckCircle2 } from "lucide-react";
+import { useAuth } from "@/contexts/AuthContext";
+import { mockAudit } from "@/lib/mock-audit";
+import { Button, Card, FieldError, FormErrorSummary } from "@/components/ui";
+import {
+  emailFormat,
+  getErrorList,
+  joinDescribedBy,
+  minLength,
+  required,
+  type ValidationErrors,
+} from "@/lib/form-validation";
 
-type SignInState = "default" | "invalid" | "loading" | "success";
+type SignInField = "email" | "password" | "form";
+type SignInState = "idle" | "loading" | "success";
 
 export default function SignInPage() {
+  const { signIn } = useAuth();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
-  const [state, setState] = useState<SignInState>("default");
-  const [error, setError] = useState<string | null>(null);
-  const { signIn } = useAuth();
+  const [state, setState] = useState<SignInState>("idle");
+  const [errors, setErrors] = useState<ValidationErrors<SignInField>>({});
+  const [submitted, setSubmitted] = useState(false);
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setError(null);
+  const validate = () => {
+    const nextErrors: ValidationErrors<SignInField> = {
+      email:
+        required(email, "Email address is required") ||
+        emailFormat(email, "Enter a valid email address"),
+      password:
+        required(password, "Password is required") ||
+        minLength(password, 8, "Password must be at least 8 characters"),
+    };
+
+    setErrors(nextErrors);
+    return getErrorList(nextErrors).length === 0;
+  };
+
+  const handleSubmit = async (event: FormEvent) => {
+    event.preventDefault();
+    setSubmitted(true);
+    setErrors({});
+
+    if (!validate()) {
+      return;
+    }
+
     setState("loading");
 
     try {
       await signIn(email, password);
       setState("success");
       mockAudit.logEvent("login", { email, timestamp: new Date().toISOString() });
-    } catch (err) {
-      const errorMsg = err instanceof Error ? err.message : "Invalid email or password";
-      setError(errorMsg);
-      setState("invalid");
-      mockAudit.logEvent("login", { email, status: "failed", reason: errorMsg });
+    } catch (error) {
+      const message =
+        error instanceof Error ? error.message : "Invalid email or password";
+      const nextErrors: ValidationErrors<SignInField> = {
+        form: message,
+        password: "Check your password and try the mock credentials again.",
+      };
+      setErrors(nextErrors);
+      setState("idle");
+      mockAudit.logEvent("login", { email, status: "failed", reason: message });
     }
   };
 
-  const isInvalid = state === "invalid";
+  const handleEmailChange = (value: string) => {
+    setEmail(value);
+    setErrors((current) => ({ ...current, email: undefined, form: undefined }));
+  };
+
+  const handlePasswordChange = (value: string) => {
+    setPassword(value);
+    setErrors((current) => ({ ...current, password: undefined, form: undefined }));
+  };
+
   const isLoading = state === "loading";
   const isSuccess = state === "success";
+  const summaryErrors = submitted ? getErrorList(errors) : [];
 
   return (
-    <div className="signin-page">
-      <div className="signin-container">
-        {/* Header */}
-        <div className="signin-header">
-          <h1 className="signin-title">Welcome Back</h1>
-          <p className="signin-subtitle">Sign in to manage your AI-powered yield</p>
-        </div>
+    <main className="flex min-h-screen items-center justify-center bg-[linear-gradient(135deg,#020617_0%,#0f172a_100%)] px-4 py-10">
+      <Card className="w-full max-w-md space-y-6 border-slate-700/50 bg-dark-800/80 p-8">
+        <header className="space-y-2 text-center">
+          <h1 className="text-3xl font-bold text-slate-50">Welcome Back</h1>
+          <p className="text-sm text-slate-400">
+            Sign in to manage your AI-powered yield strategy.
+          </p>
+        </header>
 
-        {/* Form */}
-        <form onSubmit={handleSubmit} className="signin-form" noValidate>
-          {/* Email Field */}
-          <div className="signin-field">
-            <label htmlFor="email" className="signin-label">
+        <FormErrorSummary
+          title="Please fix the sign-in errors below."
+          errors={summaryErrors}
+        />
+
+        {isSuccess ? (
+          <div
+            role="status"
+            aria-live="polite"
+            className="flex items-center gap-3 rounded-2xl border border-emerald-500/30 bg-emerald-500/10 p-4 text-emerald-200"
+          >
+            <CheckCircle2 className="h-4 w-4 flex-shrink-0" />
+            <span className="text-sm">Sign in successful. Redirecting...</span>
+          </div>
+        ) : null}
+
+        <form className="space-y-5" onSubmit={handleSubmit} noValidate>
+          <div>
+            <label
+              htmlFor="email"
+              className="mb-2 block text-xs font-semibold uppercase tracking-[0.16em] text-slate-300"
+            >
               Email Address
             </label>
             <input
               id="email"
               type="email"
               value={email}
-              onChange={(e) => setEmail(e.target.value)}
+              onChange={(event) => handleEmailChange(event.target.value)}
               placeholder="name@example.com"
-              className={`signin-input ${isInvalid ? "signin-input-error" : ""}`}
-              aria-invalid={isInvalid}
-              aria-describedby={isInvalid ? "email-error" : undefined}
               disabled={isLoading || isSuccess}
-              required
+              aria-invalid={Boolean(errors.email)}
+              aria-describedby={joinDescribedBy("signin-email-hint", errors.email ? "signin-email-error" : undefined)}
+              className={`w-full rounded-xl border bg-slate-950/40 px-4 py-3 text-sm text-slate-100 outline-none transition ${
+                errors.email
+                  ? "border-red-500/60 focus:border-red-500 focus:ring-2 focus:ring-red-500/15"
+                  : "border-slate-700/60 focus:border-sky-400 focus:ring-2 focus:ring-sky-400/15"
+              }`}
             />
-            {isInvalid && (
-              <p id="email-error" className="signin-error-text" role="alert">
-                <AlertCircle size={14} />
-                {error}
-              </p>
-            )}
+            <p id="signin-email-hint" className="mt-2 text-sm text-slate-500">
+              Use the email tied to your NeuroWealth account.
+            </p>
+            <FieldError id="signin-email-error" message={errors.email} />
           </div>
 
-          {/* Password Field */}
-          <div className="signin-field">
-            <label htmlFor="password" className="signin-label">
+          <div>
+            <label
+              htmlFor="password"
+              className="mb-2 block text-xs font-semibold uppercase tracking-[0.16em] text-slate-300"
+            >
               Password
             </label>
             <input
               id="password"
               type="password"
               value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              placeholder="••••••••"
-              className={`signin-input ${isInvalid ? "signin-input-error" : ""}`}
-              aria-invalid={isInvalid}
+              onChange={(event) => handlePasswordChange(event.target.value)}
+              placeholder="password123"
               disabled={isLoading || isSuccess}
-              required
+              aria-invalid={Boolean(errors.password)}
+              aria-describedby={joinDescribedBy(
+                "signin-password-hint",
+                errors.password ? "signin-password-error" : undefined,
+              )}
+              className={`w-full rounded-xl border bg-slate-950/40 px-4 py-3 text-sm text-slate-100 outline-none transition ${
+                errors.password
+                  ? "border-red-500/60 focus:border-red-500 focus:ring-2 focus:ring-red-500/15"
+                  : "border-slate-700/60 focus:border-sky-400 focus:ring-2 focus:ring-sky-400/15"
+              }`}
             />
-            <p className="signin-hint">Hint: Use &quot;password123&quot; for mock login</p>
+            <p id="signin-password-hint" className="mt-2 text-sm text-slate-500">
+              Mock login password: <span className="font-mono text-slate-300">password123</span>
+            </p>
+            <FieldError id="signin-password-error" message={errors.password} />
           </div>
 
-          {/* Error Banner */}
-          {isInvalid && (
-            <div className="signin-error-banner" role="alert">
-              <AlertCircle size={16} />
-              <div>
-                <strong>Invalid Credentials</strong>
-                <p>{error}</p>
-              </div>
-            </div>
-          )}
-
-          {/* Success Banner */}
-          {isSuccess && (
-            <div className="signin-success-banner" role="status">
-              <CheckCircle2 size={16} />
-              <span>Sign in successful. Redirecting...</span>
-            </div>
-          )}
-
-          {/* Submit Button */}
           <Button
             type="submit"
             size="lg"
-            className="signin-submit"
             disabled={isLoading || isSuccess}
             aria-busy={isLoading}
+            className="w-full justify-center"
           >
-            {isLoading && <span className="signin-spinner" aria-hidden="true" />}
             {isLoading ? "Signing in..." : isSuccess ? "Redirecting..." : "Sign In"}
           </Button>
         </form>
 
-        {/* Footer */}
-        <div className="signin-footer">
-          <p className="signin-footer-text">
-            Don&apos;t have an account?{" "}
-            <Link href="/signup" className="signin-link">
-              Sign Up
-            </Link>
-          </p>
-        </div>
-      </div>
-
-      <style>{`
-        .signin-page {
-          min-height: 100vh;
-          display: flex;
-          align-items: center;
-          justify-content: center;
-          padding: 16px;
-          background: linear-gradient(135deg, #020617 0%, #0f172a 100%);
-        }
-
-        .signin-container {
-          width: 100%;
-          max-width: 420px;
-          background: rgba(15, 23, 42, 0.8);
-          border: 1px solid rgba(148, 163, 184, 0.15);
-          border-radius: 16px;
-          padding: 32px 24px;
-          box-shadow: 0 20px 60px rgba(0, 0, 0, 0.4);
-          backdrop-filter: blur(16px);
-          animation: slideUp 0.3s ease-out;
-        }
-
-        @keyframes slideUp {
-          from {
-            opacity: 0;
-            transform: translateY(20px);
-          }
-          to {
-            opacity: 1;
-            transform: translateY(0);
-          }
-        }
-
-        .signin-header {
-          text-align: center;
-          margin-bottom: 28px;
-        }
-
-        .signin-title {
-          font-size: 28px;
-          font-weight: 700;
-          color: #f1f5f9;
-          margin: 0 0 8px;
-          letter-spacing: -0.02em;
-        }
-
-        .signin-subtitle {
-          font-size: 14px;
-          color: #94a3b8;
-          margin: 0;
-        }
-
-        .signin-form {
-          display: flex;
-          flex-direction: column;
-          gap: 20px;
-        }
-
-        .signin-field {
-          display: flex;
-          flex-direction: column;
-          gap: 6px;
-        }
-
-        .signin-label {
-          font-size: 12px;
-          font-weight: 600;
-          color: #94a3b8;
-          text-transform: uppercase;
-          letter-spacing: 0.05em;
-        }
-
-        .signin-input {
-          background: rgba(15, 23, 42, 0.6);
-          border: 1px solid rgba(148, 163, 184, 0.2);
-          border-radius: 10px;
-          padding: 11px 14px;
-          min-height: 44px;
-          color: #e2e8f0;
-          font-size: 14px;
-          outline: none;
-          transition: all 0.2s;
-        }
-
-        .signin-input::placeholder {
-          color: #64748b;
-        }
-
-        .signin-input:focus {
-          border-color: #38bdf8;
-          box-shadow: 0 0 0 3px rgba(56, 189, 248, 0.12);
-        }
-
-        .signin-input-error {
-          border-color: rgba(239, 68, 68, 0.6);
-        }
-
-        .signin-input-error:focus {
-          border-color: #ef4444;
-          box-shadow: 0 0 0 3px rgba(239, 68, 68, 0.12);
-        }
-
-        .signin-input:disabled {
-          opacity: 0.6;
-          cursor: not-allowed;
-        }
-
-        .signin-hint {
-          font-size: 12px;
-          color: #64748b;
-          margin: 0;
-          font-style: italic;
-        }
-
-        .signin-error-text {
-          display: flex;
-          align-items: center;
-          gap: 6px;
-          font-size: 12px;
-          color: #f87171;
-          margin: 0;
-        }
-
-        .signin-error-banner {
-          display: flex;
-          align-items: flex-start;
-          gap: 12px;
-          padding: 12px 14px;
-          background: rgba(239, 68, 68, 0.08);
-          border: 1px solid rgba(239, 68, 68, 0.3);
-          border-radius: 10px;
-          color: #fca5a5;
-          font-size: 13px;
-          animation: slideDown 0.2s ease-out;
-        }
-
-        @keyframes slideDown {
-          from {
-            opacity: 0;
-            transform: translateY(-10px);
-          }
-          to {
-            opacity: 1;
-            transform: translateY(0);
-          }
-        }
-
-        .signin-error-banner svg {
-          color: #ef4444;
-          flex-shrink: 0;
-          margin-top: 2px;
-        }
-
-        .signin-error-banner strong {
-          display: block;
-          color: #f87171;
-          margin-bottom: 2px;
-        }
-
-        .signin-error-banner p {
-          margin: 0;
-        }
-
-        .signin-success-banner {
-          display: flex;
-          align-items: center;
-          gap: 12px;
-          padding: 12px 14px;
-          background: rgba(16, 185, 129, 0.08);
-          border: 1px solid rgba(16, 185, 129, 0.3);
-          border-radius: 10px;
-          color: #6ee7b7;
-          font-size: 13px;
-          animation: slideDown 0.2s ease-out;
-        }
-
-        .signin-success-banner svg {
-          color: #10b981;
-          flex-shrink: 0;
-        }
-
-        .signin-submit {
-          display: flex;
-          align-items: center;
-          justify-content: center;
-          gap: 8px;
-          min-height: 44px;
-          margin-top: 8px;
-        }
-
-        .signin-spinner {
-          display: inline-block;
-          width: 14px;
-          height: 14px;
-          border: 2px solid rgba(255, 255, 255, 0.25);
-          border-top-color: #fff;
-          border-radius: 50%;
-          animation: spin 0.65s linear infinite;
-        }
-
-        @keyframes spin {
-          to {
-            transform: rotate(360deg);
-          }
-        }
-
-        .signin-footer {
-          margin-top: 24px;
-          padding-top: 20px;
-          border-top: 1px solid rgba(148, 163, 184, 0.1);
-          text-align: center;
-        }
-
-        .signin-footer-text {
-          font-size: 14px;
-          color: #94a3b8;
-          margin: 0;
-        }
-
-        .signin-link {
-          color: #38bdf8;
-          font-weight: 600;
-          text-decoration: none;
-          transition: color 0.2s;
-        }
-
-        .signin-link:hover {
-          color: #0ea5e9;
-        }
-
-        .signin-link:focus {
-          outline: 2px solid #38bdf8;
-          outline-offset: 2px;
-          border-radius: 2px;
-        }
-
-        @media (max-width: 520px) {
-          .signin-container {
-            padding: 24px 16px;
-          }
-
-          .signin-title {
-            font-size: 24px;
-          }
-
-          .signin-form {
-            gap: 16px;
-          }
-        }
-      `}</style>
-    </div>
+        <footer className="border-t border-slate-700/50 pt-5 text-center text-sm text-slate-400">
+          Don&apos;t have an account?{" "}
+          <Link href="/signup" className="font-semibold text-sky-300 hover:text-sky-200">
+            Sign Up
+          </Link>
+        </footer>
+      </Card>
+    </main>
   );
 }
