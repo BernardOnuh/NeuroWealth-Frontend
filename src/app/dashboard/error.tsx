@@ -53,7 +53,7 @@ import { AlertTriangle } from "lucide-react";
 import { ErrorPage } from "@/components/ui/ErrorPage";
 
 export default function DashboardError({
-  error,
+  error: _error,
   reset,
 }: {
   error: Error & { digest?: string };
